@@ -26,9 +26,11 @@ void setup()
 
   mcp2515.reset();
 
+  Serial.println(mcp2515.checkError());
+
   MCP2515::ERROR result = mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
   if (result != MCP2515::ERROR_OK) {
-    Serial.println("ERROR: setBitrate failed!");
+    Serial.print("ERROR: setBitrate failed! --- ");
     Serial.println(result);
     while(1); // Halt
   }
@@ -53,10 +55,21 @@ void loop()
     Serial.println(canMsg.can_id, HEX);
     if (canMsg.can_id == 0x036)  // Check if the message is from the sender
     {
-      int value = (canMsg.data[0] << 8) | canMsg.data[1]; // Combine MSB and LSB
+      // // legacy from original example code
+      // int value = (canMsg.data[0] << 8) | canMsg.data[1]; // Combine MSB and LSB
+      // Serial.print("Value Received: ");
+      // Serial.println(value);
 
-      Serial.print("Value Received: ");
-      Serial.println(value);
+      // here's my new shi for joystick
+      int VRX, VRY;
+      memcpy(&VRX, &canMsg.data[0], sizeof(VRX)); // Copy data bytes 0-3 into VRX
+      memcpy(&VRY, &canMsg.data[4], sizeof(VRY)); // Copy data bytes 4-7 into VRY
+
+      Serial.print("VRX: ");
+      Serial.print(VRX); 
+      Serial.print(" | VRY: ");
+      Serial.println(VRY);
+      Serial.println("---------------------");
 
       // display.clearDisplay();
 

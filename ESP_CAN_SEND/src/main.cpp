@@ -38,22 +38,34 @@ void setup() {
 
 void loop() {
 
+  int VRX = analogRead(13);
+  int VRY = analogRead(12);
+
   int value = 1234; // Your integer value to send
 
   // Prepare CAN message
   canMsg.can_id  = 0x036;  // CAN ID
-  canMsg.can_dlc = 2;      // Data length code (number of bytes)
-  canMsg.data[0] = (value >> 8) & 0xFF; // MSB of value
-  canMsg.data[1] = value & 0xFF;        // LSB of value
+  canMsg.can_dlc = 8;      // Data length code (number of bytes)
+
+  // // below is from original example code
+  // canMsg.data[0] = (value >> 8) & 0xFF; // MSB of value
+  // canMsg.data[1] = value & 0xFF;        // LSB of value
+
+  // this is my new stuff for joystick
+  memcpy(&canMsg.data[0], &VRX, sizeof(VRX)); // Copy VRX into data bytes 0-3
+  memcpy(&canMsg.data[4], &VRY, sizeof(VRY)); // Copy VRY into data bytes 4-7
 
   bool messageSent = false;
   int retries = 0;
 
+  Serial.print("Sending CAN message, first byte:");
+  Serial.println(canMsg.data[0]); // Print first byte for verification
+
   while (!messageSent && retries < MAX_RETRIES) {
     
     if (mcp2515.sendMessage(&canMsg) == MCP2515::ERROR_OK) {
-      Serial.print("Value sent: ");
-      Serial.println(value);
+      // Serial.print("Value sent: ");
+      // Serial.println(value);
 
       // Wait for acknowledgment
       unsigned long startTime = millis();
