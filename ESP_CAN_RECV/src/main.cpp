@@ -1,28 +1,96 @@
 #include <SPI.h>
 #include <mcp2515.h>
 #include <Arduino.h>
-// #include <Adafruit_SSD1306.h> // OLED display library
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
-// #define SCREEN_WIDTH 128
-// #define SCREEN_HEIGHT 64
-// #define OLED_RESET -1
-// Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLDE_SDA 21
+#define OLDE_SCL 22
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+enum class Direction {
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT,
+  NEUTRAL
+};
+
+byte upArrow[8] = {
+  0b00011000,
+  0b00111100,
+  0b01111110,
+  0b11111111,
+  0b00011000,
+  0b00011000,
+  0b00011000,
+  0b00011000
+};
+
+byte downArrow[8] = {
+  0b00011000,
+  0b00011000,
+  0b00011000,
+  0b00011000,
+  0b11111111,
+  0b01111110,
+  0b00111100,
+  0b00011000
+};
+
+byte leftArrow[8] = {
+  0b00001000,
+  0b00001100,
+  0b00001110,
+  0b11111111,
+  0b11111111,
+  0b00001110,
+  0b00001100,
+  0b00001000
+};
+
+byte rightArrow[8] = {
+  0b10000000,
+  0b11000000,
+  0b11100000,
+  0b11111111,
+  0b11111111,
+  0b11100000,
+  0b11000000,
+  0b10000000
+};
 
 struct can_frame canMsg;
 MCP2515 mcp2515(5); // CS pin is GPIO 5
 
 #define CAN_ACK_ID 0x037  // CAN ID for acknowledgment
 
+void draw(Direction _dir);
+Direction getInput(int VRX, int VRY);
+
 void setup()
 {
   Serial.begin(115200);
+
   Serial.println("Setup begin - RECEIVER");
 
-  // display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  // display.clearDisplay();
-  // display.setTextColor(WHITE);
+  Serial.println("Initializing OLED...");
+  Wire.begin(OLED_SDA, OLED_SCL);
 
-  SPI.begin();
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { //0x3C is standard address
+    Serial.println(F("SSD1306 allocation failed"));     // init OLED
+    for(;;); // Loop forever if OLED fails
+  } else {
+    Serial.println("OLED initialized successfully");
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  Serial.println("Initializing MCP2515...");
 
   mcp2515.reset();
 
@@ -71,18 +139,6 @@ void loop()
       Serial.println(VRY);
       Serial.println("---------------------");
 
-      // display.clearDisplay();
-
-      // display.setTextSize(1);
-      // display.setCursor(25, 10);
-      // display.print("Received: ");
-
-      // display.setTextSize(2);
-      // display.setCursor(25, 30);
-      // display.print(value);
-
-      // display.display();
-
       // Send acknowledgment
       canMsg.can_id  = CAN_ACK_ID;  // Use ACK ID
       canMsg.can_dlc = 0;           // No data needed for ACK
@@ -90,5 +146,66 @@ void loop()
       Serial.println("ACK sent, ID: 0x037");
     }
   }
+
+  Direction dir = getInput(VRX, VRY);
+
+  draw(dir);
+
   delay(200);
+}
+
+
+
+void draw(Direction _dir){
+  display.clearDisplay();
+
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println("ESP32 CAN BUS RECEIVER");
+
+  switch (Direction)
+  {
+  case Direction::UP:
+    display.drawBitmap(56, 16, upArrow, 16, 16, SSD1306_WHITE);
+    break;
+  case Direction::DOWN:
+    display.drawBitmap(56, 32, downArrow, 16, 16, SSD1306_WHITE);
+    break;
+  case Direction::LEFT:
+    display.drawBitmap(48, 24, leftArrow, 16, 16, SSD1306_WHITE);
+    break;
+  case Direction::RIGHT:
+    display.drawBitmap(64, 24, rightArrow, 16, 16, SSD1306_WHITE);
+    break;
+  case Direction::NEUTRAL:
+    display.drawCircle(64, 24, 8, SSD1306_WHITE);
+  default:
+    break;
+  }
+
+  display.display();
+}
+
+Direction getInput(int VRX, int VRY){
+
+    // deadzone threshold
+    const int DEADZONE = 200;
+    const int CENTER = 512;
+    
+    int x = VRX - CENTER;
+    int y = VRY - CENTER;
+    
+    // apply deadzone
+    if (abs(x) < DEADZONE && abs(y) < DEADZONE) {
+        return Direction::Neutral;
+    }
+    
+    // Determine which axis has more movement
+    if (abs(x) > abs(y)) {
+        // Horizontal movement is dominant
+        return (x > 0) ? Direction::Right : Direction::Left;
+    } else {
+        // Vertical movement is dominant
+        return (y > 0) ? Direction::Up : Direction::Down;
+    }
 }
