@@ -12,17 +12,38 @@ MCP2515 mcp2515(5); // SPI CS pin is GPIO 5
 void setup() {
   Serial.begin(115200);
   Serial.println("Setup begin - SENDER");
-  SPI.begin();
+  SPI.begin(18, 19, 23, 5);  // SCK, MISO, MOSI, CS
+  delay(500);
   mcp2515.reset();
+  delay(500);
+
+  uint8_t status = mcp2515.getStatus();
+  Serial.print("MCP2515 Status: ");
+  Serial.println(status, HEX);
 
   MCP2515::ERROR result = mcp2515.setBitrate(CAN_500KBPS, MCP_8MHZ);
   if (result != MCP2515::ERROR_OK) {
     Serial.println("ERROR: setBitrate failed!");
     Serial.println(result);
+
+    if (result == MCP2515::ERROR_FAIL) {
+      Serial.println("ERROR_FAIL");
+    } else if (result == MCP2515::ERROR_ALLTXBUSY) {
+      Serial.println("ERROR_ALLTXBUSY");
+    } else if (result == MCP2515::ERROR_FAILINIT) {
+      Serial.println("ERROR_FAILINIT");
+    } else if (result == MCP2515::ERROR_FAILTX) {
+      Serial.println("ERROR_FAILTX");
+    } else if (result == MCP2515::ERROR_NOMSG) {
+      Serial.println("ERROR_NOMSG");
+    }
+
     while(1); // Halt
   } else {
     Serial.println("Bitrate set to 500kbps");
   }
+
+  delay(2000); // Wait before changing mode
 
   result = mcp2515.setNormalMode();
   if (result != MCP2515::ERROR_OK) {
@@ -97,5 +118,5 @@ void loop() {
     Serial.println("Failed to send message after retries");
   }
 
-  delay(1000); // Send data every second
+  delay(40); // 25hz
 }
